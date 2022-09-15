@@ -1,5 +1,12 @@
-use glam::{vec3, EulerRot, Mat4};
+use glam::{vec3, EulerRot, Mat4,Vec4};
 use {egui_miniquad as egui_mq, miniquad as mq};
+use backtrace::*;
+
+fn dump_stack() {
+    let bt = Backtrace::new();
+    println!("backtrace dump start ===============");
+    println!("{:?}", bt);
+} 
 
 struct Stage {
     egui_mq: egui_mq::EguiMq,
@@ -8,15 +15,29 @@ struct Stage {
     offscreen_pass: mq::RenderPass,
     rx: f32,
     ry: f32,
+    set_font:bool,
 }
-
+#[repr(C)]
+struct Vec2 {
+    x: f32,
+    y: f32,
+}
+#[repr(C)]
+struct Vertex {
+    pos: Vec2,
+    uv: Vec2,
+}
 impl Stage {
     pub fn new(ctx: &mut mq::Context) -> Stage {
+      //  let dpi_scale= ctx.dpi_scale();
+        let (width, height) = ctx.screen_size();
+      //  let (width, height) = (width*dpi_scale, height*dpi_scale);
+
         let color_img = mq::Texture::new_render_texture(
             ctx,
             mq::TextureParams {
-                width: 256,
-                height: 256,
+                width: width as u32,
+                height: height as u32,
                 format: mq::TextureFormat::RGBA8,
                 ..Default::default()
             },
@@ -24,8 +45,8 @@ impl Stage {
         let depth_img = mq::Texture::new_render_texture(
             ctx,
             mq::TextureParams {
-                width: 256,
-                height: 256,
+                width: width as u32,
+                height: height as u32,
                 format: mq::TextureFormat::Depth,
                 ..Default::default()
             },
@@ -34,57 +55,34 @@ impl Stage {
         let offscreen_pass = mq::RenderPass::new(ctx, color_img, depth_img);
 
         #[rustfmt::skip]
-        let vertices: &[f32] = &[
-            /* pos               color                   uvs */
-            -1.0, -1.0, -1.0,    1.0, 0.5, 0.5, 1.0,     0.0, 0.0,
-             1.0, -1.0, -1.0,    1.0, 0.5, 0.5, 1.0,     1.0, 0.0,
-             1.0,  1.0, -1.0,    1.0, 0.5, 0.5, 1.0,     1.0, 1.0,
-            -1.0,  1.0, -1.0,    1.0, 0.5, 0.5, 1.0,     0.0, 1.0,
-
-            -1.0, -1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     0.0, 0.0,
-             1.0, -1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     1.0, 0.0,
-             1.0,  1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     1.0, 1.0,
-            -1.0,  1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     0.0, 1.0,
-
-            -1.0, -1.0, -1.0,    0.5, 0.5, 1.0, 1.0,     0.0, 0.0,
-            -1.0,  1.0, -1.0,    0.5, 0.5, 1.0, 1.0,     1.0, 0.0,
-            -1.0,  1.0,  1.0,    0.5, 0.5, 1.0, 1.0,     1.0, 1.0,
-            -1.0, -1.0,  1.0,    0.5, 0.5, 1.0, 1.0,     0.0, 1.0,
-
-             1.0, -1.0, -1.0,    1.0, 0.5, 0.0, 1.0,     0.0, 0.0,
-             1.0,  1.0, -1.0,    1.0, 0.5, 0.0, 1.0,     1.0, 0.0,
-             1.0,  1.0,  1.0,    1.0, 0.5, 0.0, 1.0,     1.0, 1.0,
-             1.0, -1.0,  1.0,    1.0, 0.5, 0.0, 1.0,     0.0, 1.0,
-
-            -1.0, -1.0, -1.0,    0.0, 0.5, 1.0, 1.0,     0.0, 0.0,
-            -1.0, -1.0,  1.0,    0.0, 0.5, 1.0, 1.0,     1.0, 0.0,
-             1.0, -1.0,  1.0,    0.0, 0.5, 1.0, 1.0,     1.0, 1.0,
-             1.0, -1.0, -1.0,    0.0, 0.5, 1.0, 1.0,     0.0, 1.0,
-
-            -1.0,  1.0, -1.0,    1.0, 0.0, 0.5, 1.0,     0.0, 0.0,
-            -1.0,  1.0,  1.0,    1.0, 0.0, 0.5, 1.0,     1.0, 0.0,
-             1.0,  1.0,  1.0,    1.0, 0.0, 0.5, 1.0,     1.0, 1.0,
-             1.0,  1.0, -1.0,    1.0, 0.0, 0.5, 1.0,     0.0, 1.0
+        let vertices: [Vertex; 4] = [
+            Vertex { pos : Vec2 { x: -1., y: -1. }, uv: Vec2 { x: 0., y: 0. } },
+            Vertex { pos : Vec2 { x:  1., y: -1. }, uv: Vec2 { x: 1., y: 0. } },
+            Vertex { pos : Vec2 { x:  1., y:  1. }, uv: Vec2 { x: 1., y: 1. } },
+            Vertex { pos : Vec2 { x: -1., y:  1. }, uv: Vec2 { x: 0., y: 1. } },
         ];
-
-        let vertex_buffer = mq::Buffer::immutable(ctx, mq::BufferType::VertexBuffer, vertices);
+        let vertex_buffer = mq::graphics::Buffer::immutable(ctx, mq::graphics::BufferType::VertexBuffer, &vertices);
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
             0, 1, 2,  0, 2, 3,
-            6, 5, 4,  7, 6, 4,
-            8, 9, 10,  8, 10, 11,
-            14, 13, 12,  15, 14, 12,
-            16, 17, 18,  16, 18, 19,
-            22, 21, 20,  23, 22, 20
         ];
 
         let index_buffer = mq::Buffer::immutable(ctx, mq::BufferType::IndexBuffer, indices);
 
+        let pixels: [u8; 4 * 4 * 4] = [
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
+            0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        ];
+        let texture = mq::graphics::Texture::from_rgba8(ctx, 4, 4, &pixels);
+
         let offscreen_bind = mq::Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer,
-            images: vec![],
+            index_buffer: index_buffer,
+            images: vec![texture],
         };
 
         let offscreen_shader = mq::Shader::new(
@@ -95,22 +93,14 @@ impl Stage {
         )
         .unwrap();
 
-        let offscreen_pipeline = mq::Pipeline::with_params(
+        let offscreen_pipeline = mq::Pipeline::new(
             ctx,
-            &[mq::BufferLayout {
-                stride: 36,
-                ..Default::default()
-            }],
+            &[mq::BufferLayout::default()],
             &[
-                mq::VertexAttribute::new("pos", mq::VertexFormat::Float3),
-                mq::VertexAttribute::new("color0", mq::VertexFormat::Float4),
+                mq::VertexAttribute::new("pos", mq::VertexFormat::Float2),
+                mq::VertexAttribute::new("uv", mq::VertexFormat::Float2),
             ],
             offscreen_shader,
-            mq::PipelineParams {
-                depth_test: mq::Comparison::LessOrEqual,
-                depth_write: true,
-                ..Default::default()
-            },
         );
 
         Stage {
@@ -120,6 +110,7 @@ impl Stage {
             offscreen_pass,
             rx: 0.,
             ry: 0.,
+            set_font:false,
         }
     }
 }
@@ -128,22 +119,10 @@ impl mq::EventHandler for Stage {
     fn update(&mut self, _ctx: &mut mq::Context) {}
 
     fn draw(&mut self, ctx: &mut mq::Context) {
+        let dpi_scale= ctx.dpi_scale();
         let (width, height) = ctx.screen_size();
-        let proj = Mat4::perspective_rh_gl(60.0f32.to_radians(), width / height, 0.01, 10.0);
-        let view = Mat4::look_at_rh(
-            vec3(0.0, 1.5, 3.0),
-            vec3(0.0, 0.0, 0.0),
-            vec3(0.0, 1.0, 0.0),
-        );
-        let view_proj = proj * view;
-
-        self.rx += 0.01;
-        self.ry += 0.03;
-        let model = Mat4::from_euler(EulerRot::YXZ, self.rx, self.ry, 0.);
-
-        let vs_params = offscreen_shader::Uniforms {
-            mvp: view_proj * model,
-        };
+        let (width, height) = (width/dpi_scale, height/dpi_scale);
+    //  println!("w={} h={}",width,height);
 
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
         ctx.begin_pass(
@@ -152,8 +131,16 @@ impl mq::EventHandler for Stage {
         );
         ctx.apply_pipeline(&self.offscreen_pipeline);
         ctx.apply_bindings(&self.offscreen_bind);
-        ctx.apply_uniforms(&vs_params);
-        ctx.draw(0, 36, 1);
+        let t = mq::date::now();
+        for i in 0..10 {
+            let t = t + i as f64 * 0.3;
+
+         //   ctx.apply_uniforms(&offscreen_shader::Uniforms {
+           //     offset: (t.cos() as f32 * 0.5, (t * 3.).cos() as f32 * 0.5),
+            //});
+            ctx.draw(0, 6, 1);
+        }
+        ctx.apply_viewport(0, 0, width as i32, height as i32);
         ctx.end_render_pass();
 
         // Extract texture from offscreen render pass
@@ -161,17 +148,88 @@ impl mq::EventHandler for Stage {
 
         // create egui TextureId from Miniquad GL texture Id
         let egui_texture_id = egui::TextureId::User(mq_texture.gl_internal_id() as u64);
-
         ctx.clear(Some((1., 1., 1., 1.)), None, None);
         ctx.begin_default_pass(mq::PassAction::clear_color(0.0, 0.0, 0.0, 1.0));
+        //ctx.apply_viewport(0, 0, width as i32, height as i32);
         ctx.end_render_pass();
 
         // Run the UI code:
         self.egui_mq.run(ctx, |_mq_ctx, egui_ctx| {
-            egui::Window::new("egui ❤ miniquad").show(egui_ctx, |ui| {
+            
+            use egui::epaint::text::{FontDefinitions,FontFamily,FontData};
+            if self.set_font == false {
+                let mut fonts = FontDefinitions::default();
+                //
+                // Install my own font (maybe supporting non-latin characters):
+                fonts.font_data.insert("my_font".to_owned(),
+                FontData::from_static(include_bytes!("../SourceHanSerifCN-Regular.ttf"))); // .ttf and .otf supported
+                
+                // Put my font first (highest priority):
+                fonts.families.get_mut(&FontFamily::Proportional).unwrap()
+                .insert(0, "my_font".to_owned());
+                
+                // Put my font as last fallback for monospace:
+            //  fonts.fonts_for_family.get_mut(&FontFamily::Monospace).unwrap()
+                //   .push("my_font".to_owned());
+                egui_ctx.set_fonts(fonts);
+                self.set_font=true;
+            }
+            egui::CentralPanel::default().frame(egui::Frame::dark_canvas(&egui_ctx.style())).show(egui_ctx, |ui| {
+                ui.image(egui_texture_id, egui::Vec2::new(width, height));
+            });  
+            egui::Window::new("GST").vscroll(true).show(egui_ctx, |ui| {
+        //        ui.image(egui_texture_id, egui::Vec2::new(10.0, 10.0));
+                ui.image(egui_texture_id, egui::Vec2::new(200.0,140.0));
+                /*
                 ui.image(egui_texture_id, egui::Vec2::new(140.0, 140.0));
+                ui.image(egui_texture_id, egui::Vec2::new(10.0, 10.0));
+                ui.image(egui_texture_id, egui::Vec2::new(140.0, 140.0));
+                ui.image(egui_texture_id, egui::Vec2::new(140.0, 140.0));
+                ui.image(egui_texture_id, egui::Vec2::new(10.0, 10.0));
+                ui.image(egui_texture_id, egui::Vec2::new(140.0, 140.0));
+                ui.image(egui_texture_id, egui::Vec2::new(140.0, 140.0));
+                */
                 #[cfg(not(target_arch = "wasm32"))]
                 {
+                    if ui.button("IP1").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP2").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP3").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP4").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP5").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP6").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP7").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP8").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP9").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP10").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP11").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP12").clicked() {
+                        std::process::exit(0);
+                    }
+                    if ui.button("IP13").clicked() {
+                        std::process::exit(0);
+                    }
                     if ui.button("Quit").clicked() {
                         std::process::exit(0);
                     }
@@ -204,6 +262,7 @@ impl mq::EventHandler for Stage {
         y: f32,
     ) {
         self.egui_mq.mouse_button_down_event(ctx, mb, x, y);
+        println!("mb={:?}",mb); println!("x={:?} {:?}",x, y);
     }
 
     fn mouse_button_up_event(
@@ -223,7 +282,11 @@ impl mq::EventHandler for Stage {
         _keymods: mq::KeyMods,
         _repeat: bool,
     ) {
+        dump_stack();
+        println!("keymods={:?}",_keymods); println!("char={:?}",character);
+        println!("character={:?}",character); println!("_keymods _repeat={:?} {:?}",_keymods, _repeat);
         self.egui_mq.char_event(character);
+    
     }
 
     fn key_down_event(
@@ -244,47 +307,58 @@ impl mq::EventHandler for Stage {
 fn main() {
     let conf = mq::conf::Conf {
         high_dpi: true,
+       // window_width: 1024,
+       // window_height: 768,
+        fullscreen: true,
         ..Default::default()
     };
-    mq::start(conf, |mut ctx| Box::new(Stage::new(&mut ctx)));
+    mq::start(conf, |mut ctx|{ 
+        let dpi_scale= ctx.dpi_scale();
+        let (width, height) = ctx.screen_size();
+        let (width, height) = (width*dpi_scale, height*dpi_scale);
+        ctx.set_window_size(width as u32,height as u32);
+        Box::new(Stage::new(&mut ctx))});
 }
 
 mod offscreen_shader {
+    use glam::Vec4;
     use miniquad as mq;
 
+//    uniform mat4 mvp;
+
     pub const VERTEX: &str = r#"#version 100
-    attribute vec4 pos;
-    attribute vec4 color0;
+    attribute vec2 pos;
+    attribute vec2 uv;
+    uniform vec2 offset;
+    varying lowp vec2 texcoord;
 
-    varying lowp vec4 color;
-
-    uniform mat4 mvp;
-
+    
     void main() {
-        gl_Position = mvp * pos;
-        color = color0;
+        gl_Position =  vec4(pos+offset,0,1);
+        texcoord = uv;
     }
     "#;
 
     pub const FRAGMENT: &str = r#"#version 100
-    varying lowp vec4 color;
-
+    varying lowp vec2 texcoord;
+    uniform sampler2D tex;
     void main() {
-        gl_FragColor = color;
+        gl_FragColor = texture2D(tex, texcoord);;
     }
     "#;
 
     pub fn meta() -> mq::ShaderMeta {
         mq::ShaderMeta {
-            images: vec![],
+            images: vec!["tex".to_string()],
             uniforms: mq::UniformBlockLayout {
-                uniforms: vec![mq::UniformDesc::new("mvp", mq::UniformType::Mat4)],
+                uniforms: vec![mq::UniformDesc::new("offset", mq::UniformType::Float2)],
             },
         }
     }
 
     #[repr(C)]
     pub struct Uniforms {
-        pub mvp: glam::Mat4,
+      //  pub mvp: glam::Mat4,
+      pub offset: (f32,f32),
     }
 }

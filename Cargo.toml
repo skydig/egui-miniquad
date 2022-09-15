@@ -17,10 +17,15 @@ keywords = ["gui", "imgui", "immediate", "portable", "gamedev"]
 include = ["../LICENSE-APACHE", "../LICENSE-MIT", "**/*.rs", "Cargo.toml"]
 
 [dependencies]
+backtrace = "0.3.65" 
 bytemuck = "1.9"
 egui = { version = "0.19.0", features = ["bytemuck"] }
-miniquad = { version = "0.3.12" }
+#miniquad = { version = "0.3.12" }
+#miniquad = { path="./miniquad" }
+miniquad = { git="https://github.com/skydig/miniquad", rev="48676f2"}
 quad-url = "0.1"
+once_cell = "1.14.0"
+hrstopwatch = "0.0.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2.7", features = ["custom"] }

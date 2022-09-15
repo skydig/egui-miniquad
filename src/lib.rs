@@ -211,7 +211,7 @@ impl EguiMq {
         if cursor_icon == egui::CursorIcon::None {
             mq_ctx.show_mouse(false);
         } else {
-          //  mq_ctx.show_mouse(true);
+//            mq_ctx.show_mouse(true);
 
             let mq_cursor_icon = to_mq_cursor_icon(cursor_icon);
             let mq_cursor_icon = mq_cursor_icon.unwrap_or(mq::CursorIcon::Default);
@@ -312,6 +312,7 @@ impl EguiMq {
 
     /// Call from your [`miniquad::EventHandler`].
     pub fn char_event(&mut self, chr: char) {
+        println!("char={:?}",chr);
         if input::is_printable_char(chr)
             && !self.egui_input.modifiers.ctrl
             && !self.egui_input.modifiers.mac_cmd

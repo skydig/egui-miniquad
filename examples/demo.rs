@@ -123,6 +123,8 @@ impl mq::EventHandler for Stage {
         _keymods: mq::KeyMods,
         _repeat: bool,
     ) {
+        println!("keymods={:?}",_keymods); println!("char={:?}",character);
+        println!("character={:?}",character); println!("_keymods _repeat={:?} {:?}",_keymods, _repeat);
         self.egui_mq.char_event(character);
     }
 
